@@ -1,3 +1,2 @@
 performative.txt
-channels*.json
-data/external/*.npy
+data/*
