@@ -89,11 +89,8 @@ demo = gr.Interface(
     this model will give you similar ones.
     """,
     examples=[
-        ["Every Frame a Painting"],
-        ["NerdCore"],
-        ["Game Maker's Toolkit"],
-        ["Lessons from the Dead"],
-        ["YourMounds"],
+        ["fern"],
+        ["Secret Base"],
     ],
 )
 
