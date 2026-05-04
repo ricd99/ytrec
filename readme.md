@@ -1,6 +1,6 @@
 # videos while you eat.
 
-I found myself refreshing my YouTube recommendations for 10+ minutes one night when I ate alone. The recommendations were based on my recent watch history, but I wanted to watch a mystery/crime video essay in the style of LEMMiNO (great channel). YouTube lacks a channel-based recommendation function, so I built one myself.
+I found myself refreshing my YouTube recommendations for 10+ minutes one night when I ate alone. The recommendations were based on my recent watch history, but I wanted to watch a mystery/crime video essay (something I hadn't watched in weeks) in the style of LEMMiNO (great channel). YouTube's recommendations can be too skewed towards recent activity, and YouTube lacks a channel-based recommendation function, so I built a web app to solve these two problems.
 
 ## Technologies
 This is a non-exhaustive list that covers the core technologies used for this project. 
