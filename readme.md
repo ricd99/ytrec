@@ -1,6 +1,6 @@
 # videos while you eat.
 
-I found myself refreshing my YouTube recommendations for 10+ minutes on most nights when I ate alone. This web app helps find video essay-style YouTube channels (i.e. medium and long-form content creators that are enjoyable to watch while eating a meal) that are similar to a given channel. I am no longer refreshing my recommendations for 10+ minutes!
+I found myself refreshing my YouTube recommendations for 10+ minutes one night when I ate alone. The videos were based on my recent watch history, but I wanted to watch a mystery/crime video essay in the style of LEMMiNO (great channel). YouTube lacks a channel-based recommendation function, so I built one myself.
 
 ## Technologies
 This is a non-exhaustive list that covers the core technologies used for this project. 
