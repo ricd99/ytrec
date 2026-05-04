@@ -49,20 +49,19 @@ def get_prediction(channel: ChannelName):
 
 
 # === GRADIO WEB INTERFACE ===
-def gradio_interface(channel_name):
+def gradio_predict(channel_name):
     """
     Gradio interface function that processes form inputs and returns prediction.
-    
+
     This function:
     1. Takes individual form inputs from Gradio UI
-    2. Constructs the data dictionary matching the API schema
-    3. Calls the same inference pipeline used by the API
-    4. Returns user-friendly prediction string
-    
+    2. Calls the same inference pipeline used by the API
+    3. Returns formatted prediction string
+
     """
-    
+
     try:
-        result = predict(channel_name) 
+        result = predict(channel_name)
         if isinstance(result, dict) and "error" in result:
             return result["error"]
 
@@ -77,22 +76,49 @@ def gradio_interface(channel_name):
 
 
 # === GRADIO UI CONFIGURATION ===
-# Build comprehensive Gradio interface with all customer features
-demo = gr.Interface(
-    fn=gradio_interface,
-    inputs=gr.Text(label="Channel Name"),
-    outputs=gr.Textbox(label="Recommended YT channels", lines=2),
-    title="similar channels to watch when you eat",
-    description="""
-    can't find a yt channel to watch and your food is getting cold?
-    enter a name of a youtube channel you enjoyed while eating recently. 
-    this model will give you similar ones.
-    """,
-    examples=[
-        ["fern"],
-        ["Secret Base"],
-    ],
-)
+# Using gr.Blocks for flexible layout structure with rows and columns
+with gr.Blocks(title="similar channels to watch when you eat") as demo:
+    gr.Markdown("# 🍽️ Similar Channels to Watch While You Eat")
+    gr.Markdown(
+        "Can't find a yt channel to watch and your food is getting cold? "
+        "Enter a name of a youtube channel you enjoyed while eating recently."
+    )
+
+    with gr.Row():
+        with gr.Column(scale=1):
+            channel_input = gr.Textbox(
+                label="Channel Name",
+                placeholder="e.g., fern, Secret Base",
+                lines=1
+            )
+            search_btn = gr.Button("🔍 Find Similar Channels", variant="primary")
+
+            gr.Markdown("### Examples")
+            gr.Examples(
+                examples=[["fern"], ["Secret Base"]],
+                inputs=channel_input,
+            )
+
+        with gr.Column(scale=2):
+            output_box = gr.Textbox(
+                label="Recommended YT Channels",
+                lines=10,
+                interactive=False
+            )
+
+    # Connect the button click to the prediction function
+    search_btn.click(
+        fn=gradio_predict,
+        inputs=channel_input,
+        outputs=output_box
+    )
+
+    # Also allow Enter key to trigger search
+    channel_input.submit(
+        fn=gradio_predict,
+        inputs=channel_input,
+        outputs=output_box
+    )
 
 # === MOUNT GRADIO UI INTO FASTAPI ===
 # This creates the /ui endpoint that serves the Gradio interface
