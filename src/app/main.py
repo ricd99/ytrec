@@ -1,13 +1,8 @@
 """
-FASTAPI + (GRADIO SERVING APPLICATION - soon!)
+FASTAPI + GRADIO SERVING APPLICATION
 
 This application provides a complete serving solution for the ytrec model
-with both programmatic API access and (a user-friendly web interface - soon!).
-
-Architecture:
-- FastAPI: High-performance REST API with automatic OpenAPI documentation
-- (Gradio: User-friendly web UI for manual testing and demonstrations - soon!)
-- Pydantic: Data validation and automatic API documentation
+with both programmatic API access and a user-friendly web interface.
 """
 
 from fastapi import FastAPI
@@ -16,24 +11,18 @@ from src.serving.inference import predict
 import gradio as gr
 
 app = FastAPI(
-    title = "ytrec prediction API",
-    description = "ML API for showing related long-form yt channels based on a query channel",
-    version = "1.0.0"
+    title="ytrec prediction API",
+    description="ML API for showing related long-form yt channels based on a query channel",
+    version="1.0.0"
 )
 
 
 @app.get("/")
 def root():
-    """
-    Health check endpoint for AWS Application Load Balancer
-    """
     return {"status": "ok"}
 
 
 class ChannelName(BaseModel):
-    """
-    Yt channel data schema
-    """
     channel_name: str
 
 
@@ -44,43 +33,56 @@ def get_prediction(channel: ChannelName):
         return {"prediction": result}
     except Exception as e:
         return {"error": str(e)}
-    
 
 
-
-# === GRADIO WEB INTERFACE ===
 def gradio_predict(channel_name):
-    """
-    Gradio interface function that processes form inputs and returns prediction.
-
-    This function:
-    1. Takes individual form inputs from Gradio UI
-    2. Calls the same inference pipeline used by the API
-    3. Returns formatted prediction string
-
-    """
-
     try:
         result = predict(channel_name)
         if isinstance(result, dict) and "error" in result:
-            return result["error"]
+            return f"<p style='color:red'>{result['error']}</p>"
+        if not result:
+            return "<p>No channels found.</p>"
 
-        output = ""
-        for r in result:
-            output += f"{r['channel_name']}\n"
-            output += f"https://www.youtube.com/channel/{r['channel_id']}\n"
-            output += f"similarity score: {r['similarity_score']:.4f}\n\n"
-        return output.strip()
+        html = """
+        <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-top:10px;">
+        """
+
+        for idx, r in enumerate(result, 1):
+            channel_name = r['channel_name']
+            channel_id = r['channel_id']
+            suffix = "st" if idx == 1 else "nd" if idx == 2 else "rd" if idx == 3 else "th"
+
+            if idx == 1:
+                bg, text_color, link_color = "#FFD700", "#333333", "#003366"
+            elif idx == 2:
+                bg, text_color, link_color = "#C0C0C0", "#333333", "#003366"
+            elif idx == 3:
+                bg, text_color, link_color = "#CD7F32", "#ffffff", "#ffe0b2"
+            else:
+                bg, text_color, link_color = "#2a2a2a", "#ffffff", "#ff9933"
+
+            html += f"""
+            <div style="border:1px solid #333; border-radius:8px; padding:16px; background:{bg}; margin-bottom:8px;">
+                <p style="font-size:0.9em; color:{text_color}; margin-bottom:8px; font-weight:bold;">{idx}{suffix} closest match</p>
+                <h3 style="margin:0 0 8px 0; color:{text_color};">{channel_name}</h3>
+                <a href="https://www.youtube.com/channel/{channel_id}" target="_blank" style="color:{link_color}; text-decoration:none; font-weight:bold;">
+                    Watch on YouTube →
+                </a>
+            </div>
+            """
+
+        html += "</div>"
+        return html
     except Exception as e:
-        return "error: " + str(e)
+        return f"<p style='color:red'>error: {str(e)}</p>"
 
 
-# === GRADIO UI CONFIGURATION ===
-# Using gr.Blocks for flexible layout structure with rows and columns
-with gr.Blocks(title="similar channels to watch when you eat") as demo:
-    gr.Markdown("# 🍽️ Similar Channels to Watch While You Eat")
+css = "body { background-color: #000000 !important; color: #ffffff !important; }"
+
+with gr.Blocks(title="similar channels to watch when you eat", css=css) as demo:
+    gr.Markdown("# Similar Channels to Watch While You Eat")
     gr.Markdown(
-        "Can't find a yt channel to watch and your food is getting cold? "
+        "Can't find a youtube channel to watch and your food is getting cold? "
         "Enter a name of a youtube channel you enjoyed while eating recently."
     )
 
@@ -91,40 +93,21 @@ with gr.Blocks(title="similar channels to watch when you eat") as demo:
                 placeholder="e.g., fern, Secret Base",
                 lines=1
             )
-            search_btn = gr.Button("🔍 Find Similar Channels", variant="primary")
-
+            search_btn = gr.Button("Find Similar Channels", variant="primary")
             gr.Markdown("### Examples")
             gr.Examples(
-                examples=[["fern"], ["Secret Base"]],
+                examples=[["LEMMiNO"], ["Secret Base"]],
                 inputs=channel_input,
             )
 
         with gr.Column(scale=2):
-            output_box = gr.Textbox(
-                label="Recommended YT Channels",
-                lines=10,
-                interactive=False
+            output_html = gr.HTML(
+                value="<p style='color:#aaa; text-align:center; padding:40px; font-size:1.1em;'>"
+                       "Enter a channel name and click search to see recommendations.</p>",
+                label="Recommended Channels"
             )
 
-    # Connect the button click to the prediction function
-    search_btn.click(
-        fn=gradio_predict,
-        inputs=channel_input,
-        outputs=output_box
-    )
+    search_btn.click(fn=gradio_predict, inputs=channel_input, outputs=output_html)
+    channel_input.submit(fn=gradio_predict, inputs=channel_input, outputs=output_html)
 
-    # Also allow Enter key to trigger search
-    channel_input.submit(
-        fn=gradio_predict,
-        inputs=channel_input,
-        outputs=output_box
-    )
-
-# === MOUNT GRADIO UI INTO FASTAPI ===
-# This creates the /ui endpoint that serves the Gradio interface
-# IMPORTANT: This must be the final line to properly integrate Gradio with FastAPI
-app = gr.mount_gradio_app(
-    app,           # FastAPI application instance
-    demo,          # Gradio interface
-    path="/ui"     # URL path where Gradio will be accessible
-)
+app = gr.mount_gradio_app(app, demo, path="/ui")
