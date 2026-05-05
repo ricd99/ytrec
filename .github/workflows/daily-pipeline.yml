@@ -1,0 +1,40 @@
+name: Daily Pipeline Run
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  workflow_dispatch:  # Manual trigger for on-demand runs
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2  # Matches S3 client region in etl.py
+
+      - name: Run pipeline
+        env:
+          YOUTUBE_API_KEY_RYAN: ${{ secrets.YOUTUBE_API_KEY_RYAN }}
+          YOUTUBE_API_KEY_ELI: ${{ secrets.YOUTUBE_API_KEY_ELI }}
+          YOUTUBE_API_KEY_RYO: ${{ secrets.YOUTUBE_API_KEY_RYO }}
+          YOUTUBE_API_KEY_ESTER: ${{ secrets.YOUTUBE_API_KEY_ESTER }}
+          RDS_HOST: ${{ secrets.RDS_HOST }}
+          RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ secrets.HF_REPO_ID }}
+        run: uv run python scripts/run_pipeline.py --experiment "Daily-Auto-Run"
