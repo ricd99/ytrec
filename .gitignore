@@ -18,9 +18,8 @@ __pycache__/
 #venv
 .venv
 
-# don't ignore the serving model
-!src/serving/model/
-!src/serving/model/**
+#notebooks
+notebooks
 
 #logs
 logs/
