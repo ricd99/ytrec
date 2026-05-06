@@ -7,7 +7,8 @@ import sys
 import time
 import argparse
 import mlflow
-import json, joblib
+import json
+import joblib
 from datetime import datetime
 from sklearn.model_selection import train_test_split
 
@@ -19,6 +20,7 @@ from scripts.data_pipeline.etl import run_etl
 from src.db.connection import db_manager
 from src.core.config import settings
 from src.core.pipeline_state import PipelineState
+from src.core.failure_tracker import FailureTracker
 from src.features.build_features import build_features
 from src.utils.validate_data import validate_data
 from src.embedding import batch_encode
@@ -33,36 +35,46 @@ def main(args):
     Main training pipeline function that orchestrates the complete ML workflow.
     """
     project_root = Path(__file__).resolve().parent.parent
-    mlruns_path = project_root / "mlruns"
+    pipeline_start_time = time.time()
 
-    mlflow.set_tracking_uri(mlruns_path.as_uri())
+    # Use S3 for MLflow tracking (persistent across GitHub Actions runs)
+    mlflow_s3_uri = f"s3://{settings.s3_bucket}/mlflow/"
+    mlflow.set_tracking_uri(mlflow_s3_uri)
     mlflow.set_experiment(args.experiment)
 
     with mlflow.start_run():
         pipeline_state = PipelineState()
+        failure_tracker = FailureTracker()
         run_id = datetime.now().strftime("run-%Y%m%d-%H%M%S")
         pipeline_state.start_run(run_id)
 
         try:
             # === STAGE 1: Collect New Channels ===
             print("collecting new channels from yt api")
+            stage_start = time.time()
             collect()
+            mlflow.log_metric("stage_collect_time", time.time() - stage_start)
             pipeline_state.complete_stage("collect")
 
             # === STAGE 2: ETL ===
             print("running etl")
+            stage_start = time.time()
             new_channel_count = run_etl()
+            mlflow.log_metric("stage_etl_time", time.time() - stage_start)
             pipeline_state.set_new_channel_count(new_channel_count)
             pipeline_state.complete_stage("etl", metadata={"new_channel_count": new_channel_count})
 
             if new_channel_count == 0:
                 print("no new channels found. skipping model training")
+                mlflow.log_metric("pipeline_total_time", time.time() - pipeline_start_time)
                 pipeline_state.reset()
                 return
 
             # === STAGE 3: Data Loading ===
             print("Loading data from RDS...")
+            stage_start = time.time()
             df_enc = db_manager.fetch_dataframe("SELECT * FROM channels_final")
+            mlflow.log_metric("stage_load_time", time.time() - stage_start)
             print(f"Data loaded: {df_enc.shape[0]} rows, {df_enc.shape[1]} columns")
             pipeline_state.complete_stage("load")
 
@@ -85,7 +97,9 @@ def main(args):
 
             # === STAGE 3.1: Data Validation ===
             print("Validating data quality...")
+            stage_start = time.time()
             is_valid, failed = validate_data(df_enc)
+            mlflow.log_metric("stage_validate_time", time.time() - stage_start)
             mlflow.log_metric("data_quality_pass", int(is_valid))
             pipeline_state.record_validation(is_valid, failed)
             pipeline_state.complete_stage("validate")
@@ -113,24 +127,29 @@ def main(args):
             print(f"Train: {df_train.shape[0]} samples | Test: {df_test.shape[0]} samples")
 
             # Get hyperparameters (currently returns hardcoded values - could be enhanced with Optuna)
+            stage_start = time.time()
             best_params = tune_model(df_train, df_test)
+            mlflow.log_metric("stage_tune_time", time.time() - stage_start)
             mlflow.log_params(best_params)
             print(f"Hyperparameters: {best_params}")
             pipeline_state.complete_stage("train", metadata={"best_params": best_params})
 
             # === STAGE 5: Final Training ===
             print("Training optimized Nearest Neighbors model...")
-            t0 = time.time()
+            stage_start = time.time()
             nn, embeddings, df_lookup = train_model(df_train, params=best_params)
-            train_time = time.time() - t0
+            train_time = time.time() - stage_start
             mlflow.log_metric("train_time", train_time)
+            mlflow.log_metric("stage_train_time", train_time)
             print(f"Model trained in {train_time:.2f} seconds")
 
             # === STAGE 6: Evaluating===
             print("Evaluating model...")
+            stage_start = time.time()
             test_texts = df_test["text"].fillna("").tolist()
             test_embeddings = batch_encode(test_texts)
             mean_dist, median_dist = evaluate_model(nn, test_embeddings)
+            mlflow.log_metric("stage_evaluate_time", time.time() - stage_start)
             mlflow.log_metric("mean_nn_distance", mean_dist)
             mlflow.log_metric("median_nn_distance", median_dist)
             print(f"Mean distance: {mean_dist}")
@@ -139,6 +158,7 @@ def main(args):
 
             # === STAGE 7: Save Model===
             print("Saving model...")
+            stage_start = time.time()
             joblib.dump(nn, os.path.join(artifacts_dir, "nn_model.pkl"))
             joblib.dump(embeddings, os.path.join(artifacts_dir, "embeddings.pkl"))
             joblib.dump(df_lookup, os.path.join(artifacts_dir, "df_lookup.pkl"))
@@ -146,11 +166,13 @@ def main(args):
             mlflow.log_artifact(os.path.join(artifacts_dir, "nn_model.pkl"))
             mlflow.log_artifact(os.path.join(artifacts_dir, "embeddings.pkl"))
             mlflow.log_artifact(os.path.join(artifacts_dir, "df_lookup.pkl"))
+            mlflow.log_metric("stage_save_time", time.time() - stage_start)
             print(f"Model and embeddings and lookup table saved to {artifacts_dir}")
             pipeline_state.complete_stage("save", metadata={"artifacts_dir": artifacts_dir})
 
             # === STAGE 8: Upload to Hugging Face Hub ===
             print("Uploading artifacts to Hugging Face Hub...")
+            stage_start = time.time()
             from huggingface_hub import HfApi
             api = HfApi()
 
@@ -166,16 +188,35 @@ def main(args):
                     )
                     print(f"Uploaded {filename} to {settings.hf_repo_id}")
 
+            mlflow.log_metric("stage_upload_time", time.time() - stage_start)
             print("Artifacts uploaded to Hugging Face Hub")
             pipeline_state.complete_stage("upload")
 
-            # Reset state on successful completion
+            # Log total pipeline time
+            total_time = time.time() - pipeline_start_time
+            mlflow.log_metric("pipeline_total_time", total_time)
+            print(f"Pipeline completed in {total_time:.2f} seconds")
             pipeline_state.reset()
-            print("Pipeline completed successfully. State reset for next run.")
 
         except Exception as e:
-            print(f"Pipeline failed with error: {str(e)}")
-            print(f"Last successful stage: {pipeline_state.state.get('last_successful_stage', 'none')}")
+            stage = pipeline_state.state.get("last_successful_stage", "collect")
+            error_msg = str(e)
+            print(f"Pipeline failed at stage: {stage}")
+            print(f"Error: {error_msg}")
+
+            # Log failure to S3 (not GitHub Issues)
+            failure_tracker.log_failure(
+                stage=stage,
+                error=error_msg,
+                run_id=run_id,
+                metadata={"new_channel_count": pipeline_state.state.get("new_channel_count", 0)}
+            )
+
+            # Log to MLflow
+            mlflow.log_metric("pipeline_failed", 1)
+            mlflow.log_param("failure_stage", stage)
+            mlflow.log_param("failure_error", error_msg[:500])  # Truncate long errors
+
             raise
 
 

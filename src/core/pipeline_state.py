@@ -3,8 +3,10 @@ Pipeline state management for checkpointing and resuming.
 Tracks which stages have completed and handles error recovery.
 """
 import json
+import boto3
 from pathlib import Path
 from datetime import datetime
+from src.core.config import settings
 from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -17,15 +19,17 @@ class PipelineState:
     STAGES = ["collect", "etl", "load", "validate", "train", "evaluate", "save", "upload"]
     
     def __init__(self):
+        self.s3 = boto3.client("s3", region_name="us-west-2")
+        self.bucket = settings.s3_bucket
         self.state_file = STATE_FILE
         self.state = self._load()
     
-    def _load(self) -> dict:
-        """Load state from disk."""
-        if self.state_file.exists():
-            with open(self.state_file, "r") as f:
-                return json.load(f)
-        return self._default_state()
+    def _load(self):
+        try:
+            response = self.s3.get_object(Bucket=self.bucket, Key="pipeline_monitoring/pipeline_state.json")
+            return json.loads(response["Body"].read())
+        except:
+            return self._default_state()
     
     def _default_state(self) -> dict:
         """Return default (empty) state."""
@@ -39,10 +43,11 @@ class PipelineState:
         }
     
     def _save(self):
-        """Save current state to disk."""
-        self.state_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.state_file, "w") as f:
-            json.dump(self.state, f, indent=2)
+        self.s3.put_object(
+            Bucket=self.bucket,
+            Key="pipeline_monitoring/pipeline_state.json",
+            Body=json.dumps(self.state, indent=2)
+        )
     
     def start_run(self, run_id: str):
         """Mark the start of a pipeline run."""
