@@ -1,9 +1,7 @@
 performative.txt
 # track only the processed channels csv
 data/*
-!data/processed/
-data/processed/*
-!data/processed/channels_pp.csv
+!data/consts/          
 
 src/data/consts/*
 mlruns/
