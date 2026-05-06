@@ -30,7 +30,7 @@ class FailureTracker:
         failures.append(entry)
         
 
-        failures = failures[settings.amount_faliure_history_to_keep:]
+        failures = failures[settings.amount_failure_history_to_keep:]
         
         # Upload to S3
         self.s3.put_object(

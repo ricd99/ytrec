@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     n_neighbors_model: int = 15
     top_k_recommendations: int = 5
     amount_validation_history_to_keep: int = -10   #indexing from array end so negative
-    amount_faliure_history_to_keep: int = -10   
+    amount_failure_history_to_keep: int = -10   
 
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
