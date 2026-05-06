@@ -14,6 +14,9 @@ This is a non-exhaustive list that covers the core technologies used for this pr
 - Google Cloud Run
 
 ## My Process
+
+in progress!
+
 This repo is split into two parts. The first part develops the nearest neighbor model that identifies similar channels. This contains the ETL pipeline + model training + uploading the model to Hugging Face. The second part is the web app that handles user queries. This includes receiving a channel name as input, turning the channel name into data for the model, and retrieving and displaying the prediction. The scripts that handle model training are located in the scripts/ directory, and the ui is located at app/main.py. Both parts rely on code located in the src/ directory. Repository organization improvements are possible; it is something I'm actively thinking about. Suggestions are welcome!
 
 - Model training
