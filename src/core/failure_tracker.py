@@ -29,8 +29,8 @@ class FailureTracker:
         failures = self._fetch_failures()
         failures.append(entry)
         
-        # Keep only last 100 failures
-        failures = failures[-100:]
+
+        failures = failures[settings.amount_faliure_history_to_keep:]
         
         # Upload to S3
         self.s3.put_object(

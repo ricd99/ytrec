@@ -89,8 +89,7 @@ class PipelineState:
             "run_id": self.state.get("run_id")
         }
         self.state["validation_history"].append(entry)
-        # Keep only last 30 entries
-        self.state["validation_history"] = self.state["validation_history"][-30:]
+        self.state["validation_history"] = self.state["validation_history"][settings.amount_validation_history_to_keep:]
         self._save()
     
     def get_validation_failure_rate(self, last_n: int = 10) -> float:
