@@ -1,4 +1,5 @@
 # videos while you eat.
+[run the app here:](https://videos-while-you-eat-825100164825.us-west1.run.app)
 
 I found myself refreshing my YouTube recommendations for 10+ minutes one night when I ate alone. The recommendations were based on my recent watch history, but I wanted to watch a mystery/crime video essay (something I hadn't watched in weeks) in the style of LEMMiNO (great channel). YouTube's recommendations can be too skewed towards recent activity, and YouTube lacks a channel-based recommendation function, so I built a web app to solve these two problems.
 
