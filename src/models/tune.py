@@ -13,5 +13,5 @@ def tune_model(df_train: np.ndarray, df_test):
     """
 
     params = {"n_neighbors": settings.n_neighbors_model, "metric": "cosine"}
-    mlflow.log_params(params)
+    # mlflow.log_params(params)
     return params
