@@ -2,7 +2,7 @@ name: Daily Pipeline Run
 
 on:
   schedule:
-    - cron: '0 19 * * *'  
+    - cron: '30 19 * * *'  
   workflow_dispatch:  # Manual trigger for on-demand runs
 
 jobs:
