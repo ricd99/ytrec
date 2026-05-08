@@ -27,6 +27,7 @@ from src.embedding import batch_encode
 from src.models.train import train_model
 from src.models.tune import tune_model
 from src.models.evaluate import evaluate_model
+from huggingface_hub import HfApi
 from pathlib import Path
 
 
@@ -111,7 +112,6 @@ def main(args):
             # mlflow.log_metric("data_drift_warning", 1)
 
         if not is_valid:
-            import json
             # mlflow.log_text(json.dumps(failed, indent=2), artifact_file="failed_expectations.json")
             pipeline_state.reset()
             raise ValueError(f"Data quality check failed. Issues: {failed}")
@@ -173,7 +173,7 @@ def main(args):
         # === STAGE 8: Upload to Hugging Face Hub ===
         print("Uploading artifacts to Hugging Face Hub...")
         stage_start = time.time()
-        from huggingface_hub import HfApi
+        
         api = HfApi()
 
         # Upload each artifact
